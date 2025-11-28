@@ -27,7 +27,7 @@ const openai = new OpenAI({
 app.get("/test-openai", async (req, res) => {
   try {
     const r = await openai.chat.completions.create({
-      model: "gpt-5.1-mini",
+      model: "gpt-4o",
       messages: [{ role: "user", content: "Say hi in one short sentence." }],
     });
 
@@ -55,11 +55,11 @@ if (!process.env.SERPAPI_API_KEY) {
 // HEALTH CHECK
 // ------------------------
 app.get("/", (req, res) => {
-  res.send("Fake-news backend running (text-only, GPT-5.1-mini)");
+  res.send("Fake-news backend running (text-only, GPT-4o)");
 });
 
 // ===============================================================
-// 1) TEXT ANALYZER — GPT-5.1-mini
+// 1) TEXT ANALYZER — GPT-4o
 // ===============================================================
 async function checkNewsWithChatGPT(articleText) {
   const systemPrompt = `
@@ -107,7 +107,7 @@ TEXT TO ANALYZE:
   `.trim();
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.1-mini", // ⭐ TEXT MODEL
+    model: "gpt-4o", // ⭐ TEXT MODEL
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -145,7 +145,7 @@ async function searchWebForClaim(claimText) {
 }
 
 // ===============================================================
-// 3) VERIFY CLAIM WITH SOURCES — GPT-5.1-mini
+// 3) VERIFY CLAIM WITH SOURCES — GPT-4o
 // ===============================================================
 async function verifyClaimWithSources(claimText, sources) {
   const systemPrompt = `
@@ -188,7 +188,7 @@ Snippet: ${s.snippet}
   `.trim();
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.1-mini",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -262,3 +262,4 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`🚀 Fake-news backend (text-only) running at http://localhost:${port}`);
 });
+
