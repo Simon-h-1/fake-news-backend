@@ -133,14 +133,14 @@ async function searchWebForClaim(claimText) {
     num: 5,
   };
 
-  const url = "https://serpapi.com/search";
-  const res = await axios.get(url, { params });
-
-  const organic = res.data.organic_results || [];
-  return organic.slice(0, 5).map((r) => ({
-    title: r.title,
-    snippet: r.snippet || "",
-    url: r.link,
+const url = "https://serpapi.com/search";
+try {
+  const res = await axios.get(url, { params });
+  const organic = res.data.organic_results || [];
+  return organic.slice(0, 5).map(/* ... */);
+} catch (error) {
+  console.error("SerpApi search failed (could be a bad key):", error.message || error);
+  return []; // <--- Return empty array gracefully on failure
   }));
 }
 
@@ -262,4 +262,5 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`🚀 Fake-news backend (text-only) running at http://localhost:${port}`);
 });
+
 
