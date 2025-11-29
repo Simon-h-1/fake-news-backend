@@ -29,11 +29,12 @@ app.get("/test-openai", async (req, res) => {
     const r = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [{ role: "user", content: "Say hi in one short sentence." }],
+      response_format: { type: "text" },
     });
 
     res.json({
       ok: true,
-      output: r.choices[0].message.content,
+      output: r.choices?.[0]?.message?.content ?? "",
     });
   } catch (err) {
     console.error("Error in /test-openai:", err);
@@ -62,6 +63,10 @@ app.get("/", (req, res) => {
 // 1) TEXT ANALYZER — GPT-4o
 // ===============================================================
 async function checkNewsWithChatGPT(articleText) {
+  if (!articleText || typeof articleText !== "string") {
+    throw new Error("articleText must be a non-empty string");
+  }
+
   const systemPrompt = `
 You are a careful misinformation and fake-news analyzer.
 
@@ -115,17 +120,32 @@ TEXT TO ANALYZE:
     response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  const content = response.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Empty response from OpenAI in checkNewsWithChatGPT");
+  }
+
+  try {
+    return JSON.parse(content);
+  } catch (err) {
+    console.error("Failed to parse JSON from OpenAI (checkNewsWithChatGPT):", content);
+    throw new Error("Invalid JSON from OpenAI in checkNewsWithChatGPT");
+  }
 }
 
 // ===============================================================
 // 2) SERPAPI SEARCH FOR CLAIM VERIFICATION
 // ===============================================================
 async function searchWebForClaim(claimText) {
-  if (!process.env.SERPAPI_API_KEY) return [];
+  const apiKey = process.env.SERPAPI_API_KEY;
+
+  if (!apiKey) {
+    console.warn("[SerpAPI] Missing SERPAPI_API_KEY, skipping search");
+    return [];
+  }
 
   const params = {
-    api_key: process.env.SERPAPI_API_KEY,
+    api_key: apiKey,
     engine: "google",
     q: claimText,
     hl: "en",
@@ -134,14 +154,23 @@ async function searchWebForClaim(claimText) {
   };
 
   const url = "https://serpapi.com/search";
-  const res = await axios.get(url, { params });
 
-  const organic = res.data.organic_results || [];
-  return organic.slice(0, 5).map((r) => ({
-    title: r.title,
-    snippet: r.snippet || "",
-    url: r.link,
-  }));
+  try {
+    const res = await axios.get(url, { params });
+    const organic = res.data?.organic_results || [];
+
+    return organic.slice(0, 5).map((r) => ({
+      title: r.title ?? "",
+      snippet: r.snippet ?? "",
+      url: r.link ?? "",
+    }));
+  } catch (err) {
+    console.error(
+      "[SerpAPI] Request failed:",
+      err?.response?.data || err.message || String(err)
+    );
+    return [];
+  }
 }
 
 // ===============================================================
@@ -196,7 +225,17 @@ Snippet: ${s.snippet}
     response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  const content = response.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Empty response from OpenAI in verifyClaimWithSources");
+  }
+
+  try {
+    return JSON.parse(content);
+  } catch (err) {
+    console.error("Failed to parse JSON from OpenAI (verifyClaimWithSources):", content);
+    throw new Error("Invalid JSON from OpenAI in verifyClaimWithSources");
+  }
 }
 
 // ===============================================================
@@ -225,7 +264,7 @@ app.post("/check", async (req, res) => {
             claim: c.claim,
             assessment: "uncertain",
             confidence: 0,
-            reasoning: ["No search results returned"],
+            reasoning: ["No search results returned or search failed"],
             sources_used: [],
           });
           continue;
@@ -260,7 +299,7 @@ app.post("/check", async (req, res) => {
 // ===============================================================
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
-  console.log(`🚀 Fake-news backend (text-only) running at http://localhost:${port}`);
+  console.log(
+    `🚀 Fake-news backend (text-only) running at http://localhost:${port}`
+  );
 });
-
-
