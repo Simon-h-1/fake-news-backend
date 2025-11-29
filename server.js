@@ -12,6 +12,47 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ===============================================================
+// SIMPLE DAILY RATE LIMIT (IN-MEMORY)
+// ===============================================================
+const DAILY_LIMIT = 50;
+// key: "<clientId>:YYYY-MM-DD" -> count
+const usageCounters = {};
+
+// Try to identify a client (per-IP, works behind common proxies)
+function getClientId(req) {
+  const xfwd = req.headers["x-forwarded-for"];
+  if (xfwd) {
+    // first IP in X-Forwarded-For
+    return xfwd.split(",")[0].trim();
+  }
+  return (
+    req.ip ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    "unknown"
+  );
+}
+
+function rateLimit(req, res, next) {
+  const clientId = getClientId(req);
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const key = `${clientId}:${today}`;
+
+  const current = usageCounters[key] || 0;
+
+  if (current >= DAILY_LIMIT) {
+    return res.status(429).json({
+      error: "Daily analysis limit reached",
+      limit: DAILY_LIMIT,
+      reset: "Resets at midnight (UTC)",
+    });
+  }
+
+  usageCounters[key] = current + 1;
+  next();
+}
+
 // ------------------------
 // OPENAI SETUP
 // ------------------------
@@ -23,7 +64,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Optional simple test route
+// Optional simple test route (not rate-limited)
 app.get("/test-openai", async (req, res) => {
   try {
     const r = await openai.chat.completions.create({
@@ -254,7 +295,7 @@ Snippet: ${s.snippet}
 // ===============================================================
 // 4) MAIN ARTICLE ROUTE — /check (TEXT ONLY)
 // ===============================================================
-app.post("/check", async (req, res) => {
+app.post("/check", rateLimit, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || typeof text !== "string") {
@@ -310,7 +351,7 @@ app.post("/check", async (req, res) => {
 // ===============================================================
 // 5) HIGHLIGHTED CLAIM ROUTE — /verify-claim
 // ===============================================================
-app.post("/verify-claim", async (req, res) => {
+app.post("/verify-claim", rateLimit, async (req, res) => {
   try {
     const { claim } = req.body;
 
