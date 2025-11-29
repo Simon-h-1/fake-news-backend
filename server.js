@@ -128,7 +128,10 @@ TEXT TO ANALYZE:
   try {
     return JSON.parse(content);
   } catch (err) {
-    console.error("Failed to parse JSON from OpenAI (checkNewsWithChatGPT):", content);
+    console.error(
+      "Failed to parse JSON from OpenAI (checkNewsWithChatGPT):",
+      content
+    );
     throw new Error("Invalid JSON from OpenAI in checkNewsWithChatGPT");
   }
 }
@@ -182,20 +185,27 @@ You are a fact-checking assistant.
 
 You get:
 - a claim
-- web search results (titles, snippets, URLs)
+- web search results (titles, snippets, URLs) about that claim
 
 Your job:
 - Decide if the claim is likely true, likely false, misleading, or uncertain.
-- Cite the relevant sources (by title or URL).
+- Cite only independent sources. Do NOT treat the article being checked itself as a source.
 - Base your reasoning ONLY on the provided snippets.
-- Output JSON.
+- When listing sources_used, ONLY use URLs and titles that appear in the SEARCH RESULTS.
+- Output strict JSON with this shape (no extra keys):
 
 {
   "claim": "...",
-  "assessment": "...",
+  "assessment": "likely true" | "likely false" | "misleading" | "uncertain",
   "confidence": 0-1,
-  "reasoning": [...],
-  "sources_used": [...]
+  "reasoning": ["...", "..."],
+  "sources_used": [
+    {
+      "title": "Short name, preferably news org + article title (e.g. 'BBC – Article about X')",
+      "url": "https://example.com/article",
+      "note": "Optional short note on how this source was used"
+    }
+  ]
 }
   `.trim();
 
@@ -233,7 +243,10 @@ Snippet: ${s.snippet}
   try {
     return JSON.parse(content);
   } catch (err) {
-    console.error("Failed to parse JSON from OpenAI (verifyClaimWithSources):", content);
+    console.error(
+      "Failed to parse JSON from OpenAI (verifyClaimWithSources):",
+      content
+    );
     throw new Error("Invalid JSON from OpenAI in verifyClaimWithSources");
   }
 }
