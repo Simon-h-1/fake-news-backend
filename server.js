@@ -308,6 +308,37 @@ app.post("/check", async (req, res) => {
 });
 
 // ===============================================================
+// 5) HIGHLIGHTED CLAIM ROUTE — /verify-claim
+// ===============================================================
+app.post("/verify-claim", async (req, res) => {
+  try {
+    const { claim } = req.body;
+
+    if (!claim || typeof claim !== "string") {
+      return res.status(400).json({ error: "No claim provided" });
+    }
+
+    const sources = await searchWebForClaim(claim);
+
+    if (!sources.length) {
+      return res.json({
+        claim,
+        assessment: "uncertain",
+        confidence: 0,
+        reasoning: ["No search results returned or search failed"],
+        sources_used: [],
+      });
+    }
+
+    const verified = await verifyClaimWithSources(claim, sources);
+    res.json(verified);
+  } catch (err) {
+    console.error("Error in /verify-claim:", err);
+    res.status(500).json({ error: "Failed to verify claim" });
+  }
+});
+
+// ===============================================================
 // START SERVER
 // ===============================================================
 const port = process.env.PORT || 4000;
